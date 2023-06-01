@@ -211,11 +211,105 @@ object SpanBuilder {
       }
     }
 
-  def liftOptionT[F[_]: MonadCancelThrow](
-      builder: Aux[F, Span[F]]
-  ): Aux[OptionT[F, *], Span[OptionT[F, *]]] =
+  private final class LiftedOptionT[F[_]: MonadCancelThrow](
+      builder: SpanBuilder.Aux[F, Span[F]]
+  ) extends SpanBuilder[OptionT[F, *]] { outer =>
+    type Result = Span[OptionT[F, *]]
+
+    def addAttribute[A](attribute: Attribute[A]): Builder =
+      new LiftedOptionT[F](builder.addAttribute(attribute))
+    def addAttributes(attributes: Attribute[_]*): Builder =
+      new LiftedOptionT[F](builder.addAttributes(attributes: _*))
+    def addLink(spanContext: SpanContext, attributes: Attribute[_]*): Builder =
+      new LiftedOptionT[F](builder.addLink(spanContext, attributes: _*))
+    def withFinalizationStrategy(strategy: SpanFinalizer.Strategy): Builder =
+      new LiftedOptionT[F](builder.withFinalizationStrategy(strategy))
+    def withSpanKind(spanKind: SpanKind): Builder =
+      new LiftedOptionT[F](builder.withSpanKind(spanKind))
+    def withStartTimestamp(timestamp: FiniteDuration): Builder =
+      new LiftedOptionT[F](builder.withStartTimestamp(timestamp))
+    def root: Builder =
+      new LiftedOptionT[F](builder.root)
+    def withParent(parent: SpanContext): Builder =
+      new LiftedOptionT[F](builder.withParent(parent))
+    def wrapResource[A](resource: Resource[OptionT[F, *], A])(implicit
+        ev: Result =:= Span[OptionT[F, *]]
+    ): SpanBuilder.Aux[OptionT[F, *], Span.Res[OptionT[F, *], A]] =
+      ???
+    def build: SpanOps.Aux[OptionT[F, *], Result] =
+      new SpanOps[OptionT[F, *]] {
+        type Result = outer.Result
+
+        def startUnmanaged(implicit
+            ev: Result =:= Span[OptionT[F, *]]
+        ): OptionT[F, Span[OptionT[F, *]]] =
+          OptionT
+            .liftF(builder.build.startUnmanaged)
+            .map(Span.liftOptionT(_))
+        def use[A](f: Result => OptionT[F, A]): OptionT[F, A] =
+          OptionT(
+            builder.build.use(spanF => f(Span.liftOptionT(spanF)).value)
+          )
+        def use_ : OptionT[F, Unit] =
+          OptionT.liftF(builder.build.use_)
+        def surround[A](fa: OptionT[F, A]): OptionT[F, A] =
+          OptionT(builder.build.surround(fa.value))
+      }
+  }
+
+  private final class LiftedOptionTRes[F[_]: MonadCancelThrow, A](
+      builder: SpanBuilder.Aux[F, Span.Res[F, A]]
+  ) extends SpanBuilder[OptionT[F, *]] { outer =>
+    type Result = Span.Res[OptionT[F, *], A]
+
+    def addAttribute[B](attribute: Attribute[B]): Builder =
+      new LiftedOptionTRes[F, A](builder.addAttribute(attribute))
+    def addAttributes(attributes: Attribute[_]*): Builder =
+      new LiftedOptionTRes[F, A](builder.addAttributes(attributes: _*))
+    def addLink(spanContext: SpanContext, attributes: Attribute[_]*): Builder =
+      new LiftedOptionTRes[F, A](builder.addLink(spanContext, attributes: _*))
+    def withFinalizationStrategy(strategy: SpanFinalizer.Strategy): Builder =
+      new LiftedOptionTRes[F, A](builder.withFinalizationStrategy(strategy))
+    def withSpanKind(spanKind: SpanKind): Builder =
+      new LiftedOptionTRes[F, A](builder.withSpanKind(spanKind))
+    def withStartTimestamp(timestamp: FiniteDuration): Builder =
+      new LiftedOptionTRes[F, A](builder.withStartTimestamp(timestamp))
+    def root: Builder =
+      new LiftedOptionTRes[F, A](builder.root)
+    def withParent(parent: SpanContext): Builder =
+      new LiftedOptionTRes[F, A](builder.withParent(parent))
+    def wrapResource[B](resource: Resource[OptionT[F, *], B])(implicit
+        ev: Result =:= Span[OptionT[F, *]]
+    ): SpanBuilder.Aux[OptionT[F, *], Span.Res[OptionT[F, *], B]] =
+      throw new IllegalStateException(
+        "unmatched generalized constraint (unreachable)"
+      )
+    def build: SpanOps.Aux[OptionT[F, *], Result] =
+      new SpanOps[OptionT[F, *]] {
+        type Result = outer.Result
+
+        def startUnmanaged(implicit
+            ev: Result =:= Span[OptionT[F, *]]
+        ): OptionT[F, Span[OptionT[F, *]]] =
+          throw new IllegalStateException(
+            "unmatched generalized constraint (unreachable)"
+          )
+        def use[B](f: Result => OptionT[F, B]): OptionT[F, B] =
+          OptionT(
+            builder.build.use(spanF => f(Span.Res.liftOptionT(spanF)).value)
+          )
+        def use_ : OptionT[F, Unit] =
+          OptionT.liftF(builder.build.use_)
+        def surround[B](fa: OptionT[F, B]): OptionT[F, B] =
+          OptionT(builder.build.surround(fa.value))
+      }
+  }
+
+  def liftOptionT[F[_]: MonadCancelThrow, S[x[_]] <: Span[x]](
+      builder: SpanBuilder.Aux[F, S[F]]
+  ): SpanBuilder.Aux[OptionT[F, *], S[OptionT[F, *]]] =
     new SpanBuilder[OptionT[F, *]] { outer =>
-      type Result = Span[OptionT[F, *]]
+      type Result = S[OptionT[F, *]]
 
       def addAttribute[A](attribute: Attribute[A]): Builder =
         liftOptionT(builder.addAttribute(attribute))
@@ -238,9 +332,8 @@ object SpanBuilder {
         liftOptionT(builder.withParent(parent))
       def wrapResource[A](resource: Resource[OptionT[F, *], A])(implicit
           ev: Result =:= Span[OptionT[F, *]]
-      ): Aux[OptionT[F, *], Span.Res[OptionT[F, *], A]] =
+      ): SpanBuilder.Aux[OptionT[F, *], Span.Res[OptionT[F, *], A]] =
         ???
-
       def build: SpanOps.Aux[OptionT[F, *], Result] =
         new SpanOps[OptionT[F, *]] {
           type Result = outer.Result
