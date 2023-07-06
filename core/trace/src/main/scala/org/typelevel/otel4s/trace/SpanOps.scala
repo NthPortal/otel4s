@@ -16,6 +16,9 @@
 
 package org.typelevel.otel4s.trace
 
+import cats.effect.Resource
+import cats.~>
+
 trait SpanOps[F[_]] {
   type Result <: Span[F]
 
@@ -104,6 +107,8 @@ trait SpanOps[F[_]] {
     *   See [[use]] for more details regarding lifecycle strategy
     */
   def surround[A](fa: F[A]): F[A]
+
+  def resource: Resource[F, F ~> F]
 }
 
 object SpanOps {

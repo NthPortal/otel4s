@@ -65,7 +65,8 @@ object TracingExample extends IOApp.Simple {
           val resource: Resource[IO, Unit] =
             Resource.make(IO.sleep(50.millis))(_ => IO.sleep(100.millis))
           tracer
-            .resourceSpan("resource")(resource)
+            .spanResource("resource")
+            .flatMap(resource.mapK(_))
             .surround(
               Work[IO].request(
                 Map(

@@ -136,7 +136,8 @@ object TraceExample extends IOApp.Simple {
           val resource: Resource[IO, Unit] =
             Resource.make(IO.sleep(50.millis))(_ => IO.sleep(100.millis))
           tracer
-            .resourceSpan("Start up")(resource)
+            .spanResource("Start up")
+            .flatMap(resource.mapK(_))
             .surround(
               userIdAlg
                 .getAllUsersForInstitution(

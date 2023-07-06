@@ -17,9 +17,9 @@
 package org.typelevel.otel4s
 package trace
 
-import cats.Applicative
-import cats.effect.kernel.MonadCancelThrow
-import cats.effect.kernel.Resource
+import cats.{Applicative, ~>}
+import cats.effect.MonadCancelThrow
+import cats.effect.Resource
 import org.typelevel.otel4s.meta.InstrumentMeta
 
 @annotation.implicitNotFound("""
@@ -180,10 +180,8 @@ object Tracer {
 
   trait Meta[F[_]] extends InstrumentMeta[F] {
     def noopSpanBuilder: SpanBuilder.Aux[F, Span[F]]
-    final def noopResSpan[A](
-        resource: Resource[F, A]
-    ): SpanBuilder.Aux[F, Span.Res[F, A]] =
-      noopSpanBuilder.wrapResource(resource)
+    final def noopResSpan: Resource[F, F ~> F] =
+      noopSpanBuilder.build.resource
   }
 
   object Meta {

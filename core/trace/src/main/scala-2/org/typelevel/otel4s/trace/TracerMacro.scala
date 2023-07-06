@@ -17,7 +17,8 @@
 package org.typelevel.otel4s
 package trace
 
-import cats.effect.kernel.Resource
+import cats.effect.Resource
+import cats.~>
 
 private[otel4s] trait TracerMacro[F[_]] {
   self: Tracer[F] =>
@@ -101,10 +102,8 @@ private[otel4s] trait TracerMacro[F[_]] {
     * @param attributes
     *   the set of attributes to associate with the span
     */
-  def resourceSpan[A](name: String, attributes: Attribute[_]*)(
-      resource: Resource[F, A]
-  ): SpanOps.Aux[F, Span.Res[F, A]] =
-    macro TracerMacro.resourceSpan[F, A]
+  def spanResource(name: String, attributes: Attribute[_]*): Resource[F, F ~> F] =
+    macro TracerMacro.spanResource
 }
 
 object TracerMacro {
@@ -128,14 +127,13 @@ object TracerMacro {
     q"(if ($meta.isEnabled) ${c.prefix}.spanBuilder($name).root.addAttributes(..$attributes) else $meta.noopSpanBuilder).build"
   }
 
-  def resourceSpan[F[_], A](c: blackbox.Context)(
+  def spanResource(c: blackbox.Context)(
       name: c.Expr[String],
       attributes: c.Expr[Attribute[_]]*
-  )(resource: c.Expr[Resource[F, A]]): c.universe.Tree = {
+  ): c.universe.Tree = {
     import c.universe._
     val meta = q"${c.prefix}.meta"
-
-    q"if ($meta.isEnabled) ${c.prefix}.spanBuilder($name).addAttributes(..$attributes).wrapResource($resource).build else $meta.noopResSpan($resource).build"
+    q"if ($meta.isEnabled) ${c.prefix}.spanBuilder($name).addAttributes(..$attributes).build.resource else $meta.noopResSpan"
   }
 
 }

@@ -465,13 +465,15 @@ class TracerSuite extends CatsEffectSuite {
         sdk <- makeSdk()
         tracer <- sdk.provider.get("tracer")
         _ <- tracer
-          .resourceSpan("resource-span", attribute)(mkRes(tracer))
-          .use { _ =>
-            for {
-              _ <- tracer.span("body-1").surround(IO.sleep(100.millis))
-              _ <- tracer.span("body-2").surround(IO.sleep(200.millis))
-              _ <- tracer.span("body-3").surround(IO.sleep(50.millis))
-            } yield ()
+          .spanResource("resource-span", attribute)
+          .use { f =>
+            f(mkRes(tracer).use { _ =>
+              for {
+                _ <- tracer.span("body-1").surround(IO.sleep(100.millis))
+                _ <- tracer.span("body-2").surround(IO.sleep(200.millis))
+                _ <- tracer.span("body-3").surround(IO.sleep(50.millis))
+              } yield ()
+            })
           }
         spans <- sdk.finishedSpans
         tree <- IO.pure(SpanNode.fromSpans(spans))
@@ -528,7 +530,8 @@ class TracerSuite extends CatsEffectSuite {
         sdk <- makeSdk()
         tracer <- sdk.provider.tracer("tracer").get
         _ <- tracer
-          .resourceSpan("resource-span")(mkRes)
+          .spanResource("resource-span")
+          .flatMap(mkRes.mapK(_))
           .surround(
             tracer.span("body").surround(IO.sleep(100.millis))
           )
@@ -582,7 +585,8 @@ class TracerSuite extends CatsEffectSuite {
         sdk <- makeSdk()
         tracer <- sdk.provider.tracer("tracer").get
         _ <- tracer
-          .resourceSpan("resource-span")(mkRes)
+          .spanResource("resource-span")
+          .flatMap(mkRes.mapK(_))
           .use_
         spans <- sdk.finishedSpans
         tree <- IO.pure(SpanNode.fromSpans(spans))

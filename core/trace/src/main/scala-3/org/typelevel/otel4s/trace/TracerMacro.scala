@@ -106,11 +106,11 @@ private[otel4s] trait TracerMacro[F[_]] {
     * @param attributes
     *   the set of attributes to associate with the span
     */
-  inline def resourceSpan[A](
+  inline def spanResource(
       inline name: String,
       inline attributes: Attribute[_]*
-  )(inline resource: Resource[F, A]): SpanOps.Aux[F, Span.Res[F, A]] =
-    ${ TracerMacro.resourceSpan('self, 'name, 'attributes, 'resource) }
+  ): Resource[F, F ~> F] =
+    ${ TracerMacro.spanResource('self, 'name, 'attributes) }
 
 }
 
@@ -138,20 +138,19 @@ object TracerMacro {
       else $tracer.meta.noopSpanBuilder.build
     }
 
-  def resourceSpan[F[_], A](
+  def spanResource[F[_]](
       tracer: Expr[Tracer[F]],
       name: Expr[String],
-      attributes: Expr[Seq[Attribute[_]]],
-      resource: Expr[Resource[F, A]]
-  )(using Quotes, Type[F], Type[A]) =
+      attributes: Expr[Seq[Attribute[_]]]
+  )(using Quotes, Type[F]) =
     '{
       if ($tracer.meta.isEnabled)
         $tracer
           .spanBuilder($name)
           .addAttributes($attributes*)
-          .wrapResource($resource)
           .build
-      else $tracer.meta.noopResSpan($resource).build
+          .resource
+      else $tracer.meta.noopResSpan
     }
 
 }
