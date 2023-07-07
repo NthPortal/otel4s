@@ -17,9 +17,6 @@
 package org.typelevel.otel4s
 package trace
 
-import cats.effect.Resource
-import cats.~>
-
 import scala.quoted.*
 
 private[otel4s] trait TracerMacro[F[_]] {
@@ -42,7 +39,7 @@ private[otel4s] trait TracerMacro[F[_]] {
     *   {{{
     * val tracer: Tracer[F] = ???
     * val span: Span[F] = ???
-    * val customParent: SpanOps.Aux[F, Span[F]] = tracer
+    * val customParent: SpanOps[F] = tracer
     *   .spanBuilder("custom-parent")
     *   .withParent(span.context)
     *   .build
@@ -60,7 +57,7 @@ private[otel4s] trait TracerMacro[F[_]] {
   inline def span(
       inline name: String,
       inline attributes: Attribute[_]*
-  ): SpanOps.Aux[F, Span[F]] =
+  ): SpanOps[F] =
     ${ TracerMacro.span('self, 'name, 'attributes) }
 
   /** Creates a new root span. Even if a parent span is available in the scope,
@@ -81,37 +78,8 @@ private[otel4s] trait TracerMacro[F[_]] {
   inline def rootSpan(
       inline name: String,
       inline attributes: Attribute[_]*
-  ): SpanOps.Aux[F, Span[F]] =
+  ): SpanOps[F] =
     ${ TracerMacro.rootSpan('self, 'name, 'attributes) }
-
-  /** Creates a new child span. The span is automatically attached to a parent
-    * span (based on the scope).
-    *
-    * The lifecycle of the span is managed automatically. That means the span is
-    * ended upon the finalization of a resource.
-    *
-    * The abnormal termination (error, cancelation) is recorded by
-    * [[SpanFinalizer.Strategy.reportAbnormal default finalization strategy]].
-    *
-    * The structure of the inner spans:
-    * {{{
-    * > name
-    *   > acquire
-    *   > use
-    *   > release
-    * }}}
-    *
-    * @param name
-    *   the name of the span
-    *
-    * @param attributes
-    *   the set of attributes to associate with the span
-    */
-  inline def spanResource(
-      inline name: String,
-      inline attributes: Attribute[_]*
-  ): Resource[F, (Span[F], F ~> F)] =
-    ${ TracerMacro.spanResource('self, 'name, 'attributes) }
 
 }
 
@@ -137,21 +105,6 @@ object TracerMacro {
       if ($tracer.meta.isEnabled)
         $tracer.spanBuilder($name).root.addAttributes($attributes*).build
       else $tracer.meta.noopSpanBuilder.build
-    }
-
-  def spanResource[F[_]](
-      tracer: Expr[Tracer[F]],
-      name: Expr[String],
-      attributes: Expr[Seq[Attribute[_]]]
-  )(using Quotes, Type[F]) =
-    '{
-      if ($tracer.meta.isEnabled)
-        $tracer
-          .spanBuilder($name)
-          .addAttributes($attributes*)
-          .build
-          .resource
-      else $tracer.meta.noopResSpan
     }
 
 }

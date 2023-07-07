@@ -406,7 +406,8 @@ class TracerSuite extends CatsEffectSuite {
       attributes: Attribute[_]*
   ): Resource[F, F ~> F] = {
     tracer
-      .spanResource("resource-span", attributes: _*)
+      .span("resource-span", attributes: _*)
+      .resource
       .flatMap { case (_, nt) =>
         Resource[F, A] {
           nt {

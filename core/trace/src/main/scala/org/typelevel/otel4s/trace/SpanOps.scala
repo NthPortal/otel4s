@@ -17,10 +17,10 @@
 package org.typelevel.otel4s.trace
 
 import cats.effect.Resource
+import cats.effect.kernel.MonadCancelThrow
 import cats.~>
 
 trait SpanOps[F[_]] {
-  type Result <: Span[F]
 
   /** Creates a [[Span]]. The span requires to be ended ''explicitly'' by
     * invoking `end`.
@@ -50,9 +50,11 @@ trait SpanOps[F[_]] {
     * }}}
     *
     * @see
-    *   [[use]], [[use_]], or [[surround]] for a managed lifecycle
+    *   [[use]], [[use_]], [[surround]], or [[resource]] for a managed lifecycle
     */
-  def startUnmanaged(implicit ev: Result =:= Span[F]): F[Span[F]]
+  def startUnmanaged: F[Span[F]]
+
+  def resource: Resource[F, (Span[F], F ~> F)]
 
   /** Creates and uses a [[Span]]. Unlike [[startUnmanaged]], the lifecycle of
     * the span is fully managed. The span is started and passed to `f` to
@@ -77,7 +79,8 @@ trait SpanOps[F[_]] {
     *   }
     *   }}}
     */
-  def use[A](f: Result => F[A]): F[A]
+  final def use[A](f: Span[F] => F[A])(implicit F: MonadCancelThrow[F]): F[A] =
+    resource.use { case (span, nt) => nt(f(span)) }
 
   /** Starts a span and ends it immediately.
     *
@@ -91,7 +94,8 @@ trait SpanOps[F[_]] {
     * @see
     *   See [[use]] for more details regarding lifecycle strategy
     */
-  def use_ : F[Unit]
+  final def use_(implicit F: MonadCancelThrow[F]): F[Unit] =
+    resource.use_
 
   /** Starts a span, runs `fa` and ends the span once `fa` terminates, fails or
     * gets interrupted.
@@ -106,13 +110,6 @@ trait SpanOps[F[_]] {
     * @see
     *   See [[use]] for more details regarding lifecycle strategy
     */
-  def surround[A](fa: F[A]): F[A]
-
-  def resource: Resource[F, (Result, F ~> F)]
-}
-
-object SpanOps {
-  type Aux[F[_], A] = SpanOps[F] {
-    type Result = A
-  }
+  final def surround[A](fa: F[A])(implicit F: MonadCancelThrow[F]): F[A] =
+    use(_ => fa)
 }

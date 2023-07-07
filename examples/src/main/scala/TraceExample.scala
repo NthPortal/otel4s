@@ -133,20 +133,18 @@ object TraceExample extends IOApp.Simple {
             UserDatabase.apply[IO]
           )
           tracer
-            .spanResource("Start up")
-            .use { case (_, nt /* natural transformation */ ) =>
+            .span("Start up")
+            .use { _ =>
               for {
-                _ <- nt(tracer.span("acquire").surround(IO.sleep(50.millis)))
-                _ <- nt {
-                  tracer.span("use").surround {
-                    userIdAlg
-                      .getAllUsersForInstitution(
-                        "9902181e-1d8d-4e00-913d-51532b493f1b"
-                      )
-                      .flatMap(IO.println)
-                  }
+                _ <- tracer.span("acquire").surround(IO.sleep(50.millis))
+                _ <- tracer.span("use").surround {
+                  userIdAlg
+                    .getAllUsersForInstitution(
+                      "9902181e-1d8d-4e00-913d-51532b493f1b"
+                    )
+                    .flatMap(IO.println)
                 }
-                _ <- nt(tracer.span("release").surround(IO.sleep(100.millis)))
+                _ <- tracer.span("release").surround(IO.sleep(100.millis))
               } yield ()
             }
       }
