@@ -49,7 +49,7 @@ private[java] class TracerImpl[F[_]: Sync](
         None
     }
 
-  def spanBuilder(name: String): SpanBuilder.Aux[F, Span[F]] =
+  def spanBuilder(name: String): SpanBuilder[F] =
     new SpanBuilderImpl[F, Span[F]](jTracer, name, scope, runner)
 
   def childScope[A](parent: SpanContext)(fa: F[A]): F[A] =

@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import cats.Monad
 import cats.effect.IO
 import cats.effect.IOApp
+import cats.effect.kernel.MonadCancelThrow
 import cats.effect.std.Console
 import cats.syntax.all._
 import org.typelevel.otel4s.Otel4s
@@ -30,7 +30,7 @@ trait Work[F[_]] {
 }
 
 object Work {
-  def apply[F[_]: Monad: Tracer: Console]: Work[F] =
+  def apply[F[_]: MonadCancelThrow: Tracer: Console]: Work[F] =
     new Work[F] {
       def request(headers: Map[String, String]): F[Unit] = {
         Tracer[F].currentSpanContext.flatMap { current =>

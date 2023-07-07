@@ -37,7 +37,7 @@ private[otel4s] trait TracerMacro[F[_]] {
     *   {{{
     * val tracer: Tracer[F] = ???
     * val span: Span[F] = ???
-    * val customParent: SpanOps.Aux[F, Span[F]] = tracer
+    * val customParent: SpanOps[F] = tracer
     *   .spanBuilder("custom-parent")
     *   .withParent(span.context)
     *   .build
@@ -52,7 +52,7 @@ private[otel4s] trait TracerMacro[F[_]] {
     * @param attributes
     *   the set of attributes to associate with the span
     */
-  def span(name: String, attributes: Attribute[_]*): SpanOps.Aux[F, Span[F]] =
+  def span(name: String, attributes: Attribute[_]*): SpanOps[F] =
     macro TracerMacro.span
 
   /** Creates a new root span. Even if a parent span is available in the scope,
@@ -73,7 +73,7 @@ private[otel4s] trait TracerMacro[F[_]] {
   def rootSpan(
       name: String,
       attributes: Attribute[_]*
-  ): SpanOps.Aux[F, Span[F]] =
+  ): SpanOps[F] =
     macro TracerMacro.rootSpan
 }
 
