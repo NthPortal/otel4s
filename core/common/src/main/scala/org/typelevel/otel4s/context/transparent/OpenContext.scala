@@ -32,14 +32,14 @@ final class OpenContext private[transparent] (contents: Map[TypedKey[_], Any])
   def updated[A](key: TypedKey[A], value: A): OpenContext =
     new OpenContext(contents.updated(key, value))
 
-  def entries: Iterator[OpenContext.TypedEntry[_]] =
+  def entries: Iterator[OpenContext.Entry[_]] =
     contents.iterator.map { case (key, value) =>
-      OpenContext.TypedEntry(key, value)
+      OpenContext.Entry(key, value)
     }
 }
 
 object OpenContext extends OpenContextProvider[SyncIO] {
-  final case class TypedEntry[A] private (key: TypedKey[A], value: A) {
+  final case class Entry[A] private(key: TypedKey[A], value: A) {
     def classTag: ClassTag[A] = key.tag
   }
 }
