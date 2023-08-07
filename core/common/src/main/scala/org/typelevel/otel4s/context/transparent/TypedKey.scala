@@ -20,13 +20,13 @@ package transparent
 import scala.reflect.ClassTag
 
 final class TypedKey[A] private[transparent] (val name: String)(implicit
-    tag: ClassTag[A]
+    private[transparent] val tag: ClassTag[A]
 ) extends Key[A] {
   override def toString: String =
     s"Key[${TypedKey.renderType(tag.runtimeClass)}]($name)"
 }
 
-private object TypedKey {
+private[transparent] object TypedKey {
   private def renderType(cls: Class[_]): String = {
     if (cls.isArray) s"Array[${renderType(cls.getComponentType)}]"
     else if (cls == classOf[AnyRef]) "AnyRef|Any"
