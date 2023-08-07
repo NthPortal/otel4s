@@ -15,12 +15,11 @@
  */
 
 package org.typelevel.otel4s
+package context
 
-import cats.mtl.Ask
-import cats.mtl.Local
-import org.typelevel.vault.Vault
+trait ContextProvider[F[_], C <: Context] {
 
-package object context {
-  type LocalVault[F[_]] = Local[F, Vault]
-  type AskVault[F[_]] = Ask[F, Vault]
+  def root: C
+
+  def uniqueKey[A: C#KeyBounds](name: String): F[C#Key[A]]
 }
