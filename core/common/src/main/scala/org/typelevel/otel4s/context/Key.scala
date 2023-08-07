@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package org.typelevel.otel4s
-package java
+package org.typelevel.otel4s.context
 
-import cats.effect.kernel.Sync
-import io.opentelemetry.context.propagation.{
-  ContextPropagators => JContextPropagators
+trait Key[A] {
+  val name: String
+
+  override def toString: String = s"Key($name)"
 }
-import org.typelevel.otel4s.java.context.Context
 
-private[java] class ContextPropagatorsImpl[F[_]: Sync](
-    propagators: JContextPropagators
-) extends ContextPropagators[F, Context] {
-  val textMapPropagator: TextMapPropagator[F, Context] =
-    new TextMapPropagatorImpl(propagators.getTextMapPropagator)
+object Key {
+  sealed trait NoBounds[+A]
+  object NoBounds {
+    implicit object Instance extends NoBounds[Nothing]
+  }
 }

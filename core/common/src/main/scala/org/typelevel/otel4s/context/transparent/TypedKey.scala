@@ -14,18 +14,22 @@
  * limitations under the License.
  */
 
-package org.typelevel.otel4s
-package java
+package org.typelevel.otel4s.context
+package transparent
 
-import cats.effect.kernel.Sync
-import io.opentelemetry.context.propagation.{
-  ContextPropagators => JContextPropagators
+import scala.reflect.ClassTag
+
+final class TypedKey[A] private[transparent] (val name: String)(implicit
+    tag: ClassTag[A]
+) extends Key[A] {
+  override def toString: String =
+    s"Key[${TypedKey.renderType(tag.runtimeClass)}]($name)"
 }
-import org.typelevel.otel4s.java.context.Context
 
-private[java] class ContextPropagatorsImpl[F[_]: Sync](
-    propagators: JContextPropagators
-) extends ContextPropagators[F, Context] {
-  val textMapPropagator: TextMapPropagator[F, Context] =
-    new TextMapPropagatorImpl(propagators.getTextMapPropagator)
+private object TypedKey {
+  private def renderType(cls: Class[_]): String = {
+    if (cls.isArray) s"Array[${renderType(cls.getComponentType)}]"
+    else if (cls == classOf[AnyRef]) "AnyRef|Any"
+    else cls.getName
+  }
 }

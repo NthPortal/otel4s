@@ -15,17 +15,11 @@
  */
 
 package org.typelevel.otel4s
-package java
+package context
 
-import cats.effect.kernel.Sync
-import io.opentelemetry.context.propagation.{
-  ContextPropagators => JContextPropagators
-}
-import org.typelevel.otel4s.java.context.Context
+trait ContextProvider[F[_], C <: Context] {
 
-private[java] class ContextPropagatorsImpl[F[_]: Sync](
-    propagators: JContextPropagators
-) extends ContextPropagators[F, Context] {
-  val textMapPropagator: TextMapPropagator[F, Context] =
-    new TextMapPropagatorImpl(propagators.getTextMapPropagator)
+  def root: C
+
+  def uniqueKey[A: C#KeyBounds](name: String): F[C#Key[A]]
 }

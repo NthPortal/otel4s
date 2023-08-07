@@ -15,17 +15,25 @@
  */
 
 package org.typelevel.otel4s
-package java
 
-import cats.effect.kernel.Sync
-import io.opentelemetry.context.propagation.{
-  ContextPropagators => JContextPropagators
+import org.typelevel.otel4s.context.Context
+import org.typelevel.otel4s.context.ContextProvider
+
+trait ContextTools[F[_], C <: Context] {
+  def propagators: ContextPropagators[F, C]
+
+  def provider: ContextProvider[F, C]
 }
-import org.typelevel.otel4s.java.context.Context
 
-private[java] class ContextPropagatorsImpl[F[_]: Sync](
-    propagators: JContextPropagators
-) extends ContextPropagators[F, Context] {
-  val textMapPropagator: TextMapPropagator[F, Context] =
-    new TextMapPropagatorImpl(propagators.getTextMapPropagator)
+object ContextTools {
+  private[this] final case class Impl[F[_], C <: Context](
+      propagators: ContextPropagators[F, C],
+      provider: ContextProvider[F, C]
+  ) extends ContextTools[F, C]
+
+  def apply[F[_], C <: Context](
+      propagators: ContextPropagators[F, C],
+      provider: ContextProvider[F, C]
+  ): ContextTools[F, C] =
+    Impl(propagators, provider)
 }

@@ -42,13 +42,14 @@ import io.opentelemetry.sdk.trace.`export`.SimpleSpanProcessor
 import io.opentelemetry.sdk.trace.internal.data.ExceptionEventData
 import munit.CatsEffectSuite
 import org.typelevel.otel4s.Attribute
-import org.typelevel.otel4s.java.ContextConversions
+import org.typelevel.otel4s.ContextTools
 import org.typelevel.otel4s.java.ContextPropagatorsImpl
+import org.typelevel.otel4s.java.context.Context
+import org.typelevel.otel4s.java.context.ContextProvider
 import org.typelevel.otel4s.java.instances._
 import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
-import org.typelevel.vault.Vault
 
 import java.time.Instant
 import scala.concurrent.duration._
@@ -852,14 +853,13 @@ class TracerSuite extends CatsEffectSuite {
     val tracerProvider: SdkTracerProvider =
       customize(builder).build()
 
-    IOLocal(Vault.empty).map { implicit ioLocal: IOLocal[Vault] =>
+    IOLocal(Context.root).map { implicit ioLocal: IOLocal[Context] =>
       val propagators = new ContextPropagatorsImpl[IO](
-        JContextPropagators.create(W3CTraceContextPropagator.getInstance()),
-        ContextConversions.toJContext,
-        ContextConversions.fromJContext
+        JContextPropagators.create(W3CTraceContextPropagator.getInstance())
       )
+      val tools = ContextTools(propagators, ContextProvider.get[IO])
 
-      val provider = TracerProviderImpl.local[IO](tracerProvider, propagators)
+      val provider = TracerProviderImpl.local[IO](tracerProvider, tools)
       new TracerSuite.Sdk(provider, exporter)
     }
   }
