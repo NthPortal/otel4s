@@ -29,7 +29,7 @@ class OpenContextProvider[F[_]: Sync] private[transparent]
 }
 
 object OpenContextProvider {
-  private val rootContext = OpenContext(Map.empty)
+  private val rootContext = new OpenContext(Map.empty)
 
   def get[F[_]: Sync]: OpenContextProvider[F] =
     new OpenContextProvider[F]
