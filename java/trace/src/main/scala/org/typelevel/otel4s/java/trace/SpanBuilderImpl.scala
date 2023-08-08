@@ -27,7 +27,6 @@ import io.opentelemetry.api.trace.{SpanKind => JSpanKind}
 import io.opentelemetry.api.trace.{Tracer => JTracer}
 import io.opentelemetry.context.{Context => JContext}
 import org.typelevel.otel4s.Attribute
-import org.typelevel.otel4s.context.ContextProvider
 import org.typelevel.otel4s.java.context.Context
 import org.typelevel.otel4s.java.context.LocalContext
 import org.typelevel.otel4s.trace.Span
@@ -42,7 +41,6 @@ import scala.concurrent.duration.FiniteDuration
 private[java] final case class SpanBuilderImpl[F[_]: Sync](
     jTracer: JTracer,
     name: String,
-    provider: ContextProvider[F, Context],
     runner: SpanRunner[F],
     parent: SpanBuilderImpl.Parent = SpanBuilderImpl.Parent.Propagate,
     finalizationStrategy: SpanFinalizer.Strategy =
@@ -134,7 +132,7 @@ private[java] final case class SpanBuilderImpl[F[_]: Sync](
         Some {
           parent match {
             case Parent.Root =>
-              provider.root.underlying
+              Context.root.underlying
             case Parent.Propagate => underlying
             case Parent.Explicit(parent) =>
               JSpan

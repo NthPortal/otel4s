@@ -25,11 +25,10 @@ import cats.syntax.all._
 import io.opentelemetry.api.{OpenTelemetry => JOpenTelemetry}
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.sdk.{OpenTelemetrySdk => JOpenTelemetrySdk}
-import org.typelevel.otel4s.ContextTools
+import org.typelevel.otel4s.ContextPropagators
 import org.typelevel.otel4s.Otel4s
 import org.typelevel.otel4s.java.Conversions.asyncFromCompletableResultCode
 import org.typelevel.otel4s.java.context.Context
-import org.typelevel.otel4s.java.context.ContextProvider
 import org.typelevel.otel4s.java.context.LocalContext
 import org.typelevel.otel4s.java.instances._
 import org.typelevel.otel4s.java.metrics.Metrics
@@ -38,7 +37,7 @@ import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.TracerProvider
 
 sealed class OtelJava[F[_]] private (
-    val context: ContextTools[F, Context],
+    val propagators: ContextPropagators[F, Context],
     val meterProvider: MeterProvider[F],
     val tracerProvider: TracerProvider[F],
 ) extends Otel4s[F] {
@@ -68,13 +67,11 @@ object OtelJava {
       jOtel: JOpenTelemetry
   ): OtelJava[F] = {
     val contextPropagators = new ContextPropagatorsImpl[F](jOtel.getPropagators)
-    val contextTools =
-      ContextTools(contextPropagators, ContextProvider.get[F])
 
     val metrics = Metrics.forAsync(jOtel)
-    val traces = Traces.local(jOtel, contextTools)
+    val traces = Traces.local(jOtel, contextPropagators)
     new OtelJava[F](
-      contextTools,
+      contextPropagators,
       metrics.meterProvider,
       traces.tracerProvider,
     ) {

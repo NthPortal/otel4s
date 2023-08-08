@@ -17,14 +17,13 @@
 package org.typelevel.otel4s
 
 import cats.Applicative
-import org.typelevel.otel4s.context.Context
 
-trait ContextPropagators[F[_], C <: Context] {
+trait ContextPropagators[F[_], C] {
   def textMapPropagator: TextMapPropagator[F, C]
 }
 
 object ContextPropagators {
-  def noop[F[_]: Applicative, C <: Context]: ContextPropagators[F, C] =
+  def noop[F[_]: Applicative, C]: ContextPropagators[F, C] =
     new ContextPropagators[F, C] {
       def textMapPropagator: TextMapPropagator[F, C] =
         TextMapPropagator.noop

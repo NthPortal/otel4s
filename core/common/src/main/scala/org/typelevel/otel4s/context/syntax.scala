@@ -15,22 +15,5 @@
  */
 
 package org.typelevel.otel4s.context
-package transparent
 
-import cats.effect.Sync
-
-import scala.reflect.ClassTag
-
-class OpenContextProvider[F[_]: Sync] private[transparent]
-    extends ContextProvider[F, OpenContext] {
-  def root: OpenContext = OpenContextProvider.rootContext
-  def uniqueKey[A: ClassTag](name: String): F[TypedKey[A]] =
-    Sync[F].delay(new TypedKey[A](name))
-}
-
-object OpenContextProvider {
-  private val rootContext = new OpenContext(Map.empty)
-
-  def get[F[_]: Sync]: OpenContextProvider[F] =
-    new OpenContextProvider[F]
-}
+object syntax extends ContextSyntax

@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 
-package org.typelevel.otel4s
-package context
+package org.typelevel.otel4s.context
 
-trait ContextProvider[F[_], C <: Context] {
-
-  def root: C
-
-  def uniqueKey[A: C#KeyBounds](name: String): F[C#Key[A]]
+trait ContextSyntax {
+  implicit def toContextOps[C: Context](context: C): Context.Ops[C] =
+    new Context.Ops(context)
 }

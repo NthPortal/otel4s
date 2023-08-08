@@ -34,10 +34,10 @@ object Traces {
 
   def local[F[_]: Sync: LocalContext](
       jOtel: JOpenTelemetry,
-      tools: ContextTools[F, Context]
+      propagators: ContextPropagators[F, Context]
   ): Traces[F] = {
     val provider =
-      TracerProviderImpl.local(jOtel.getTracerProvider, tools)
+      TracerProviderImpl.local(jOtel.getTracerProvider, propagators)
     new Traces[F] {
       def tracerProvider: TracerProvider[F] = provider
     }
@@ -45,11 +45,11 @@ object Traces {
 
   def ioLocal[F[_]: LiftIO: Sync](
       jOtel: JOpenTelemetry,
-      tools: ContextTools[F, Context]
+      propagators: ContextPropagators[F, Context]
   ): F[Traces[F]] =
-    IOLocal(tools.provider.root)
+    IOLocal(Context.root)
       .map { implicit ioLocal: IOLocal[Context] =>
-        local(jOtel, tools)
+        local(jOtel, propagators)
       }
       .to[F]
 }

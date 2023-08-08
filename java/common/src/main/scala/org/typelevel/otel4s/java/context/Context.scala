@@ -16,23 +16,23 @@
 
 package org.typelevel.otel4s.java.context
 
-import cats.effect.SyncIO
+import cats.effect.Sync
 import io.opentelemetry.api.trace.{Span => JSpan}
 import io.opentelemetry.context.{Context => JContext}
 import io.opentelemetry.context.ContextKey
-import org.typelevel.otel4s.context.{Context => CoreContext}
+import org.typelevel.otel4s.context.{Context => ContextDef}
 import org.typelevel.otel4s.context.{Key => CoreKey}
 
-sealed trait Context extends CoreContext {
-  type Self = Context
-  type Key[A] = Context.Key[A]
-  type KeyBounds[A] = CoreKey.NoBounds[A]
-
+sealed trait Context {
   def underlying: JContext
+  def get[A](key: Context.Key[A]): Option[A]
+  final def getOrElse[A](key: Context.Key[A], default: => A): A =
+    get(key).getOrElse(default)
+  def updated[A](key: Context.Key[A], value: A): Context
   private[java] def map(f: JContext => JContext): Context
 }
 
-object Context extends ContextProvider[SyncIO] {
+object Context {
   private[java] object Noop extends Context {
     val underlying: JContext =
       JSpan.getInvalid.storeInContext(root.underlying)
@@ -51,6 +51,14 @@ object Context extends ContextProvider[SyncIO] {
       wrap(f(underlying))
   }
 
+  final class Key[A] private (val name: String)
+      extends CoreKey[A]
+      with ContextKey[A]
+  object Key {
+    def unique[F[_]: Sync, A](name: String): F[Key[A]] =
+      Sync[F].delay(new Key(name))
+  }
+
   def wrap(context: JContext): Context = {
     val isNoop =
       Option(JSpan.fromContextOrNull(context))
@@ -58,7 +66,19 @@ object Context extends ContextProvider[SyncIO] {
     if (isNoop) Noop else Wrapped(context)
   }
 
-  final class Key[A] private[context] (val name: String)
-      extends CoreKey[A]
-      with ContextKey[A]
+  val root: Context = wrap(JContext.root())
+
+  implicit object Def extends ContextDef[Context] {
+    type Key[A] = Context.Key[A]
+    type KeyCreationBounds[F[_]] = Sync[F]
+    type KeyTypeBounds[A] = CoreKey.NoBounds[A]
+
+    def get[A](ctx: Context)(key: Key[A]): Option[A] =
+      ctx.get(key)
+    def updated[A](ctx: Context)(key: Key[A], value: A): Context =
+      ctx.updated(key, value)
+    def root: Context = Context.root
+    def uniqueKey[F[_]: Sync, A: CoreKey.NoBounds](name: String): F[Key[A]] =
+      Context.Key.unique(name)
+  }
 }

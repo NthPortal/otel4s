@@ -17,16 +17,21 @@
 package org.typelevel.otel4s.context
 package transparent
 
+import cats.effect.Sync
+
 import scala.reflect.ClassTag
 
-final class TypedKey[A] private[transparent] (val name: String)(implicit
-    private[transparent] val tag: ClassTag[A]
+final class TypedKey[A] private (val name: String)(implicit
+    val classTag: ClassTag[A]
 ) extends Key[A] {
   override def toString: String =
-    s"Key[${TypedKey.renderType(tag.runtimeClass)}]($name)"
+    s"Key[${TypedKey.renderType(classTag.runtimeClass)}]($name)"
 }
 
 private[transparent] object TypedKey {
+  def unique[F[_]: Sync, A: ClassTag](name: String): F[TypedKey[A]] =
+    Sync[F].delay(new TypedKey(name))
+
   private def renderType(cls: Class[_]): String = {
     if (cls.isArray) s"Array[${renderType(cls.getComponentType)}]"
     else if (cls == classOf[AnyRef]) "AnyRef|Any"

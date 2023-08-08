@@ -42,10 +42,8 @@ import io.opentelemetry.sdk.trace.`export`.SimpleSpanProcessor
 import io.opentelemetry.sdk.trace.internal.data.ExceptionEventData
 import munit.CatsEffectSuite
 import org.typelevel.otel4s.Attribute
-import org.typelevel.otel4s.ContextTools
 import org.typelevel.otel4s.java.ContextPropagatorsImpl
 import org.typelevel.otel4s.java.context.Context
-import org.typelevel.otel4s.java.context.ContextProvider
 import org.typelevel.otel4s.java.instances._
 import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.Tracer
@@ -857,9 +855,8 @@ class TracerSuite extends CatsEffectSuite {
       val propagators = new ContextPropagatorsImpl[IO](
         JContextPropagators.create(W3CTraceContextPropagator.getInstance())
       )
-      val tools = ContextTools(propagators, ContextProvider.get[IO])
 
-      val provider = TracerProviderImpl.local[IO](tracerProvider, tools)
+      val provider = TracerProviderImpl.local[IO](tracerProvider, propagators)
       new TracerSuite.Sdk(provider, exporter)
     }
   }

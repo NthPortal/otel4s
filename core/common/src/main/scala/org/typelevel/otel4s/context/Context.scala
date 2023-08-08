@@ -17,15 +17,34 @@
 package org.typelevel.otel4s
 package context
 
-trait Context {
-  type Self <: Context
+trait Context[C] {
   type Key[A] <: context.Key[A]
-  type KeyBounds[_]
+  type KeyCreationBounds[_[_]]
+  type KeyTypeBounds[_]
 
-  def get[A](key: Key[A]): Option[A]
+  def get[A](ctx: C)(key: Key[A]): Option[A]
 
-  def getOrElse[A](key: Key[A], default: => A): A =
-    get(key).getOrElse(default)
+  def getOrElse[A](ctx: C)(key: Key[A], default: => A): A =
+    get(ctx)(key).getOrElse(default)
 
-  def updated[A](key: Key[A], value: A): Self
+  def updated[A](ctx: C)(key: Key[A], value: A): C
+
+  def root: C
+
+  def uniqueKey[F[_]: KeyCreationBounds, A: KeyTypeBounds](
+      name: String
+  ): F[Key[A]]
+}
+
+object Context {
+  def apply[C](implicit c: Context[C]): Context[C] = c
+
+  final class Ops[C](context: C)(implicit val c: Context[C]) {
+    def get[A](key: c.Key[A]): Option[A] =
+      c.get(context)(key)
+    def getOrElse[A](key: c.Key[A], default: => A): A =
+      c.getOrElse(context)(key, default)
+    def updated[A](key: c.Key[A], value: A): C =
+      c.updated(context)(key, value)
+  }
 }

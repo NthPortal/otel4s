@@ -17,7 +17,6 @@
 package org.typelevel.otel4s
 
 import cats.Applicative
-import org.typelevel.otel4s.context.Context
 
 /** The process of propagating data across process boundaries involves injecting
   * and extracting values in the form of text into carriers that travel in-band.
@@ -34,7 +33,7 @@ import org.typelevel.otel4s.context.Context
   * @tparam F
   *   the higher-kinded type of a polymorphic effect
   */
-trait TextMapPropagator[F[_], C <: Context] {
+trait TextMapPropagator[F[_], C] {
 
   /** Extracts key-value pairs from the given `carrier` and adds them to the
     * given context.
@@ -90,11 +89,11 @@ trait TextMapPropagator[F[_], C <: Context] {
 
 object TextMapPropagator {
 
-  def apply[F[_], C <: Context](implicit
+  def apply[F[_], C](implicit
       ev: TextMapPropagator[F, C]
   ): TextMapPropagator[F, C] = ev
 
-  def noop[F[_]: Applicative, C <: Context]: TextMapPropagator[F, C] =
+  def noop[F[_]: Applicative, C]: TextMapPropagator[F, C] =
     new TextMapPropagator[F, C] {
       def extract[A: TextMapGetter](ctx: C, carrier: A): C =
         ctx

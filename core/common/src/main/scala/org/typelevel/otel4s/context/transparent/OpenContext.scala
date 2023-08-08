@@ -17,21 +17,33 @@
 package org.typelevel.otel4s.context
 package transparent
 
-import cats.effect.SyncIO
+import cats.effect.Sync
 
 import scala.reflect.ClassTag
 
-final case class OpenContext private[transparent] (
-    contents: Map[TypedKey[_], Any]
-) extends Context {
-  type Self = OpenContext
-  type Key[A] = TypedKey[A]
-  type KeyBounds[A] = ClassTag[A]
-
+final case class OpenContext private (contents: Map[TypedKey[_], Any]) {
   def get[A](key: TypedKey[A]): Option[A] =
     contents.get(key).map(_.asInstanceOf[A])
+  def getOrElse[A](key: TypedKey[A], default: => A): A =
+    get(key).getOrElse(default)
   def updated[A](key: TypedKey[A], value: A): OpenContext =
-    new OpenContext(contents.updated(key, value))
+    OpenContext(contents.updated(key, value))
 }
 
-object OpenContext extends OpenContextProvider[SyncIO]
+object OpenContext {
+  val root: OpenContext = apply(Map.empty)
+
+  implicit object Def extends Context[OpenContext] {
+    type Key[A] = TypedKey[A]
+    type KeyCreationBounds[F[_]] = Sync[F]
+    type KeyTypeBounds[A] = ClassTag[A]
+
+    def get[A](ctx: OpenContext)(key: TypedKey[A]): Option[A] =
+      ctx.get(key)
+    def updated[A](ctx: OpenContext)(key: TypedKey[A], value: A): OpenContext =
+      ctx.updated(key, value)
+    def root: OpenContext = OpenContext.root
+    def uniqueKey[F[_]: Sync, A: ClassTag](name: String): F[TypedKey[A]] =
+      TypedKey.unique(name)
+  }
+}
