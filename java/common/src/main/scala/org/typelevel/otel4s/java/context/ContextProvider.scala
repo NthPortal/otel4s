@@ -18,7 +18,8 @@ package org.typelevel.otel4s.java.context
 
 import cats.effect.Sync
 import io.opentelemetry.context.{Context => JContext}
-import org.typelevel.otel4s.context.{Key, ContextProvider => CoreContextProvider}
+import org.typelevel.otel4s.context.{ContextProvider => CoreContextProvider}
+import org.typelevel.otel4s.context.Key
 
 class ContextProvider[F[_]: Sync] private[context]
     extends CoreContextProvider[F, Context] {

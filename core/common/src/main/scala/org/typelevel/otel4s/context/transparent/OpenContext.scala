@@ -21,8 +21,9 @@ import cats.effect.SyncIO
 
 import scala.reflect.ClassTag
 
-final class OpenContext private[transparent] (contents: Map[TypedKey[_], Any])
-    extends Context {
+final case class OpenContext private[transparent] (
+    contents: Map[TypedKey[_], Any]
+) extends Context {
   type Self = OpenContext
   type Key[A] = TypedKey[A]
   type KeyBounds[A] = ClassTag[A]
@@ -31,15 +32,6 @@ final class OpenContext private[transparent] (contents: Map[TypedKey[_], Any])
     contents.get(key).map(_.asInstanceOf[A])
   def updated[A](key: TypedKey[A], value: A): OpenContext =
     new OpenContext(contents.updated(key, value))
-
-  def entries: Iterator[OpenContext.Entry[_]] =
-    contents.iterator.map { case (key, value) =>
-      OpenContext.Entry(key, value)
-    }
 }
 
-object OpenContext extends OpenContextProvider[SyncIO] {
-  final case class Entry[A] private(key: TypedKey[A], value: A) {
-    def classTag: ClassTag[A] = key.tag
-  }
-}
+object OpenContext extends OpenContextProvider[SyncIO]
