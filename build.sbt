@@ -298,6 +298,7 @@ lazy val oteljava = project
     name := "otel4s-oteljava",
     libraryDependencies ++= Seq(
       "io.opentelemetry" % "opentelemetry-sdk" % OpenTelemetryVersion,
+      "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % OpenTelemetryVersion,
       "io.opentelemetry" % "opentelemetry-sdk-testing" % OpenTelemetryVersion % Test
     )
   )

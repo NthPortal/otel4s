@@ -25,6 +25,12 @@ import cats.syntax.all._
 import io.opentelemetry.api.{OpenTelemetry => JOpenTelemetry}
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.sdk.{OpenTelemetrySdk => JOpenTelemetrySdk}
+import io.opentelemetry.sdk.autoconfigure.{
+  AutoConfiguredOpenTelemetrySdk => AutoConfigOtelSdk
+}
+import io.opentelemetry.sdk.autoconfigure.{
+  AutoConfiguredOpenTelemetrySdkBuilder => AutoConfigOtelSdkBuilder
+}
 import io.opentelemetry.sdk.common.CompletableResultCode
 import org.typelevel.otel4s.Otel4s
 import org.typelevel.otel4s.context.propagation.ContextPropagators
@@ -96,6 +102,25 @@ object OtelJava {
         asyncFromCompletableResultCode(Sync[F].delay(sdk.shutdown()))
       )
       .evalMap(forAsync[F])
+
+  /** Creates a [[cats.effect.Resource `Resource`]] of the automatic
+    * configuration of a Java `OpenTelemetrySdk` instance.
+    *
+    * @param customize
+    *   a function for customizing the auto-configured SDK builder
+    * @return
+    *   An [[org.typelevel.otel4s.Otel4s]] resource.
+    */
+  def autoConfigured[F[_]: LiftIO: Async](
+      customize: AutoConfigOtelSdkBuilder => AutoConfigOtelSdkBuilder = identity
+  ): Resource[F, OtelJava[F]] =
+    resource {
+      Sync[F].delay {
+        customize(AutoConfigOtelSdk.builder())
+          .build()
+          .getOpenTelemetrySdk
+      }
+    }
 
   /** Creates an [[org.typelevel.otel4s.Otel4s]] from the global Java
     * OpenTelemetry instance.
