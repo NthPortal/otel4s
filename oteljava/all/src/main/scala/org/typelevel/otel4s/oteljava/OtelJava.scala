@@ -53,6 +53,21 @@ sealed class OtelJava[F[_]] private (
 
 object OtelJava {
 
+  /** @return
+    *   a utility for creating `OtelJava` instances using the implicitly
+    *   available `LocalContext`
+    */
+  def usingLocalContext[F[_]: Async: LocalContext]: UsingLocalContext[F] =
+    new UsingLocalContext[F]
+
+  private[this] def usingRootContext[F[_]: LiftIO: Async]
+      : F[UsingLocalContext[F]] =
+    IOLocal(Context.root)
+      .map { implicit ioLocal: IOLocal[Context] =>
+        usingLocalContext[F]
+      }
+      .to[F]
+
   /** Creates an [[org.typelevel.otel4s.Otel4s]] from a Java OpenTelemetry
     * instance.
     *
@@ -64,27 +79,12 @@ object OtelJava {
     *   An effect of an [[org.typelevel.otel4s.Otel4s]] resource.
     */
   def forAsync[F[_]: LiftIO: Async](jOtel: JOpenTelemetry): F[OtelJava[F]] =
-    IOLocal(Context.root)
-      .map { implicit ioLocal: IOLocal[Context] =>
-        local[F](jOtel)
-      }
-      .to[F]
+    usingRootContext.map(_.create(jOtel))
 
   def local[F[_]: Async: LocalContext](
       jOtel: JOpenTelemetry
-  ): OtelJava[F] = {
-    val contextPropagators = jOtel.getPropagators.asScala
-
-    val metrics = Metrics.forAsync(jOtel)
-    val traces = Traces.local(jOtel, contextPropagators)
-    new OtelJava[F](
-      contextPropagators,
-      metrics.meterProvider,
-      traces.tracerProvider,
-    ) {
-      override def toString: String = jOtel.toString
-    }
-  }
+  ): OtelJava[F] =
+    usingLocalContext[F].create(jOtel)
 
   /** Lifts the acquisition of a Java OpenTelemetrySdk instance to a Resource.
     *
@@ -98,10 +98,8 @@ object OtelJava {
       acquire: F[JOpenTelemetrySdk]
   ): Resource[F, OtelJava[F]] =
     Resource
-      .make(acquire)(sdk =>
-        asyncFromCompletableResultCode(Sync[F].delay(sdk.shutdown()))
-      )
-      .evalMap(forAsync[F])
+      .eval(usingRootContext)
+      .flatMap(_.resource(acquire))
 
   /** Creates a [[cats.effect.Resource `Resource`]] of the automatic
     * configuration of a Java `OpenTelemetrySdk` instance.
@@ -114,43 +112,102 @@ object OtelJava {
   def autoConfigured[F[_]: LiftIO: Async](
       customize: AutoConfigOtelSdkBuilder => AutoConfigOtelSdkBuilder = identity
   ): Resource[F, OtelJava[F]] =
-    resource {
-      Sync[F].delay {
-        customize(AutoConfigOtelSdk.builder())
-          .build()
-          .getOpenTelemetrySdk
-      }
-    }
+    Resource
+      .eval(usingRootContext)
+      .flatMap(_.autoConfigured(customize))
 
   /** Creates an [[org.typelevel.otel4s.Otel4s]] from the global Java
     * OpenTelemetry instance.
     */
   def global[F[_]: LiftIO: Async]: F[OtelJava[F]] =
-    Sync[F].delay(GlobalOpenTelemetry.get).flatMap(forAsync[F])
+    usingRootContext.flatMap(_.global)
 
-  private[this] def asyncFromCompletableResultCode[F[_]](
-      codeF: F[CompletableResultCode],
-      msg: => Option[String] = None
-  )(implicit F: Async[F]): F[Unit] =
-    F.flatMap(codeF)(code =>
-      F.async[Unit](cb =>
-        F.delay {
-          code.whenComplete(() =>
-            if (code.isSuccess())
-              cb(Either.unit)
-            else
-              cb(
-                Left(
-                  new RuntimeException(
-                    msg.getOrElse(
-                      "OpenTelemetry SDK async operation failed"
+  /** Utility for creating [[`OtelJava`]] instances using a custom
+    * `LocalContext`.
+    */
+  final class UsingLocalContext[F[_]] private[OtelJava] (implicit
+      F: Async[F],
+      L: LocalContext[F]
+  ) {
+    private[OtelJava] def create(jOtel: JOpenTelemetry): OtelJava[F] = {
+      val contextPropagators = jOtel.getPropagators.asScala
+
+      val metrics = Metrics.forAsync(jOtel)
+      val traces = Traces.local(jOtel, contextPropagators)
+      new OtelJava[F](
+        contextPropagators,
+        metrics.meterProvider,
+        traces.tracerProvider,
+      ) {
+        override def toString: String = jOtel.toString
+      }
+    }
+
+    /** Lifts the acquisition of a Java OpenTelemetrySdk instance to a Resource.
+      *
+      * @param acquire
+      *   OpenTelemetrySdk resource
+      *
+      * @return
+      *   An [[org.typelevel.otel4s.Otel4s]] resource.
+      */
+    def resource(acquire: F[JOpenTelemetrySdk]): Resource[F, OtelJava[F]] =
+      Resource
+        .make(acquire)(sdk =>
+          asyncFromCompletableResultCode(Sync[F].delay(sdk.shutdown()))
+        )
+        .map(create)
+
+    /** Creates a [[cats.effect.Resource `Resource`]] of the automatic
+      * configuration of a Java `OpenTelemetrySdk` instance.
+      *
+      * @param customize
+      *   a function for customizing the auto-configured SDK builder
+      * @return
+      *   An [[org.typelevel.otel4s.Otel4s]] resource.
+      */
+    def autoConfigured(
+        customize: AutoConfigOtelSdkBuilder => AutoConfigOtelSdkBuilder =
+          identity
+    ): Resource[F, OtelJava[F]] =
+      resource {
+        Sync[F].delay {
+          customize(AutoConfigOtelSdk.builder())
+            .build()
+            .getOpenTelemetrySdk
+        }
+      }
+
+    /** Creates an [[org.typelevel.otel4s.Otel4s]] from the global Java
+      * OpenTelemetry instance.
+      */
+    def global: F[OtelJava[F]] =
+      Sync[F].delay(GlobalOpenTelemetry.get).map(create)
+
+    private[this] def asyncFromCompletableResultCode(
+        codeF: F[CompletableResultCode],
+        msg: => Option[String] = None
+    ): F[Unit] =
+      F.flatMap(codeF)(code =>
+        F.async[Unit](cb =>
+          F.delay {
+            code.whenComplete(() =>
+              if (code.isSuccess())
+                cb(Either.unit)
+              else
+                cb(
+                  Left(
+                    new RuntimeException(
+                      msg.getOrElse(
+                        "OpenTelemetry SDK async operation failed"
+                      )
                     )
                   )
                 )
-              )
-          )
-          None
-        }
+            )
+            None
+          }
+        )
       )
-    )
+  }
 }
